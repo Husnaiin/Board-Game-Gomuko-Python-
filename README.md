@@ -45,6 +45,64 @@ The `cmove` search is greedy and one move deep:
 
 It has no lookahead beyond that, so it is beatable with a simple fork.
 
+## Architecture
+
+One script, no classes. The board is a 2-D list `b`; everything else is a plain
+function that takes it and the current parameters. The menu picks one of two
+setup functions and one of two move sources, then a single loop drives the game.
+
+```mermaid
+flowchart TD
+    START["input: 1 (HvH) or 2 (CvH)"] --> SETUP{"init() / init2()"}
+    SETUP --> S["b (2-D list), dim, sym[], pname[],<br/>win length w, random first turn"]
+    S --> LOOP{{"while True"}}
+    LOOP --> MOVE{"move source"}
+    MOVE -->|human| SPOS["spos() / spos2(t=1)<br/>type row, col"]
+    MOVE -->|computer| CMOVE["cmove()<br/>win? then block? then random"]
+    SPOS --> VALID{"isvalid(b, r, c)"}
+    CMOVE --> VALID
+    VALID -->|taken / off board| MOVE
+    VALID -->|free| PM["pm(): b[r][c] = symbol"]
+    PM --> PRINT["printb()"]
+    PRINT --> WIN{"iswinn()<br/>scan H / V / D1 / D2 for w in a row"}
+    WIN -->|win| WMSG["print winner, break"]
+    WIN -->|no| DRAW{"isdraw()<br/>board full?"}
+    DRAW -->|full| DMSG["print draw, break"]
+    DRAW -->|space left| TC["tchange(): next player"]
+    TC --> LOOP
+
+    style LOOP fill:#8250df,color:#fff
+    style CMOVE fill:#1f6feb,color:#fff
+    style WMSG fill:#1a7f37,color:#fff
+```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Human
+    participant G as game loop
+    participant AI as cmove
+    participant B as board list
+    participant W as iswinn
+
+    Note over G: Computer-vs-Human turn
+    G->>AI: cmove(b, dim, sym, w)
+    loop win length wc from w down to 2
+        AI->>B: try each empty cell as computer
+        AI->>W: does it make wc in a row?
+        AI->>B: else try each empty cell as human
+        AI->>W: would human make wc in a row? -> block it
+    end
+    AI-->>G: chosen (r, c)  (random empty cell if nothing found)
+    G->>B: pm(): place '+'
+    G->>W: iswinn(b, dim, w, '+')
+    W-->>G: win / continue
+    G->>U: your turn: type row and column
+    U->>G: r, c
+    G->>B: pm(): place your symbol
+    G->>W: iswinn for your symbol
+```
+
 ## Requirements
 
 - Python 3.6+ (uses f-strings). No third-party packages.
